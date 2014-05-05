@@ -1,14 +1,14 @@
 from __future__ import unicode_literals
 
 if __name__ == '__main__':
+    from sys import argv
     import blogofile2tinkerer
-    raise SystemExit(blogofile2tinkerer.main())
+    raise SystemExit(blogofile2tinkerer.main(argv))
 
 from datetime import datetime
+from subprocess import PIPE, Popen
 
 from twisted.python.filepath import FilePath
-
-from html2rst import html2text
 
 HEADER_TEMPLATE = """\
 %(title)s
@@ -17,7 +17,7 @@ HEADER_TEMPLATE = """\
 .. author:: %(author)s
 .. categories:: %(categories)s
 .. tags:: %(tags)s
-.. comments: %(comments)s
+.. comments:: %(comments)s
 """
 
 SITEMAP = """\
@@ -30,13 +30,13 @@ Sitemap
 %(entries)s
 """
 
-# input
-posts = FilePath(b"_posts")
+def main(argv):
+    # input
+    posts = FilePath(argv[1])
 
-# output
-blog = FilePath(b".")
+    # output
+    blog = FilePath(argv[2])
 
-def main():
     entries = []
     for post in posts.children():
         data = post.getContent().decode("utf-8")
@@ -60,7 +60,7 @@ def main():
         if not parent.isdir():
             parent.makedirs()
 
-        entry.setContent((header + html2text(body)).encode("utf-8"))
+        entry.setContent((header + html2rst(body)).encode("utf-8"))
 
         entries.append(entry)
 
@@ -71,4 +71,13 @@ def main():
         entries="".join([
                 "\n   " + "/".join(entry.segmentsFrom(blog))
                 for entry in entries]))
-    FilePath("master.rst").setContent(sitemap.encode("utf-8"))
+    blog.child(b"master.rst").setContent(sitemap.encode("utf-8"))
+
+
+def html2rst(html):
+    process = Popen([b"pandoc", b"--from=html", b"--to=rst"], stdin=PIPE, stdout=PIPE)
+    process.stdin.write(html.encode("utf-8"))
+    process.stdin.close()
+    rst = process.stdout.read().decode("utf-8")
+    process.wait()
+    return rst
