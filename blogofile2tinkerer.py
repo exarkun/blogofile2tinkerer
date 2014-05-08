@@ -17,7 +17,8 @@ HEADER_TEMPLATE = """\
 .. author:: %(author)s
 .. categories:: %(categories)s
 .. tags:: %(tags)s
-.. comments:: %(comments)s
+.. comments::
+
 """
 
 SITEMAP = """\
@@ -30,12 +31,30 @@ Sitemap
 %(entries)s
 """
 
+def fixpath(segment):
+    return filter(lambda ch: ch.isalpha() or ch == b" ", segment).replace(b" ", b"_")
+
+
 def main(argv):
     # input
     posts = FilePath(argv[1])
 
     # output
     blog = FilePath(argv[2])
+
+    # Since Sphinx gets confused by image paths with "special" characters in
+    # them, generate new names for all the image paths and a mapping from the
+    # old names to the new names.
+    images = FilePath(argv[3])
+
+    imagepaths = []
+    for post in images.children():
+        if post.isdir():
+            imagepaths.append(post)
+            safe = post.sibling(fixpath(post.basename()))
+            if post != safe and not safe.isdir():
+                post.moveTo(safe)
+                safe.linkTo(post)
 
     entries = []
     for post in posts.children():
@@ -46,16 +65,18 @@ def main(argv):
 
         parent = blog.preauthChild(
             ("%d/%02d/%02d" % (date.year, date.month, date.day)).encode("utf-8"))
-        title = filter(
-            lambda ch: ch.isalpha() or ch == " ",
-            meta["title"].strip().lower()).replace(" ", "_")
+        title = fixpath(meta["title"].strip().lower().encode("utf-8")).decode("utf-8")
         entry = parent.child((title + ".rst").encode("utf-8"))
 
         header = HEADER_TEMPLATE % dict(
             author=meta["author"].strip(), categories="none",
-            tags=meta["categories"].strip(), comments="",
-            title=meta["title"].strip(),
+            tags=meta["categories"].strip(), title=meta["title"].strip(),
             underbar="=" * len(meta["title"].strip()))
+
+        for path in imagepaths:
+            body = body.replace(
+                u"/" + path.basename().decode("utf-8") + u"/",
+                u"/" + fixpath(path.basename()).decode("utf-8") + u"/")
 
         if not parent.isdir():
             parent.makedirs()
