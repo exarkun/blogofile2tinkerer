@@ -94,6 +94,8 @@ def main(argv):
                 for entry in entries]))
     blog.child(b"master.rst").setContent(sitemap.encode("utf-8"))
 
+    FilePath(b"conf.py").copyTo(blog.child(b"conf.py"))
+
 
 def html2rst(html):
     process = Popen([b"pandoc", b"--from=html", b"--to=rst"], stdin=PIPE, stdout=PIPE)
